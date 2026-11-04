@@ -1,0 +1,7 @@
+.idea/
+cmake-build-*/
+*.o
+*.so
+tests/snippets/*
+!tests/snippets/*.c
+!tests/snippets/*.h
