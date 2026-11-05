@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: BSD-3-Clause
 
+#include <stdint.h>
+#include <string.h>
 #include <unistd.h>
 #include <sys/mman.h>
 
@@ -159,16 +161,22 @@ static void *heap_alloc(size_t size)
 	return payload(block);
 }
 
+static void *alloc(size_t size, size_t threshold)
+{
+	size = ALIGN(size);
+
+	/* big blocks get their own mapping, small ones go on the heap */
+	if (size + META_SIZE >= threshold)
+		return map_block(size);
+	return heap_alloc(size);
+}
+
 void *os_malloc(size_t size)
 {
 	if (!size)
 		return NULL;
 
-	size = ALIGN(size);
-	/* big blocks get their own mapping, small ones go on the heap */
-	if (size + META_SIZE >= MMAP_THRESHOLD)
-		return map_block(size);
-	return heap_alloc(size);
+	return alloc(size, MMAP_THRESHOLD);
 }
 
 void os_free(void *ptr)
@@ -187,8 +195,16 @@ void os_free(void *ptr)
 
 void *os_calloc(size_t nmemb, size_t size)
 {
-	/* TODO: Implement os_calloc */
-	return NULL;
+	void *ptr;
+
+	/* also rejects nmemb * size overflow */
+	if (!nmemb || !size || nmemb > SIZE_MAX / size)
+		return NULL;
+
+	ptr = alloc(nmemb * size, getpagesize());
+	memset(ptr, 0, nmemb * size);
+
+	return ptr;
 }
 
 void *os_realloc(void *ptr, size_t size)
