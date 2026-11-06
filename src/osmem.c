@@ -207,8 +207,58 @@ void *os_calloc(size_t nmemb, size_t size)
 	return ptr;
 }
 
+static void *move_block(struct block_meta *block, size_t size)
+{
+	void *ptr = os_malloc(size);
+
+	memcpy(ptr, payload(block), block->size < size ? block->size : size);
+	os_free(payload(block));
+
+	return ptr;
+}
+
 void *os_realloc(void *ptr, size_t size)
 {
-	/* TODO: Implement os_realloc */
-	return NULL;
+	struct block_meta *block;
+
+	if (!ptr)
+		return os_malloc(size);
+
+	if (!size) {
+		os_free(ptr);
+		return NULL;
+	}
+
+	block = get_block(ptr);
+	if (block->status == STATUS_FREE)
+		return NULL;
+
+	size = ALIGN(size);
+	/* mapped blocks and new big sizes are always moved */
+	if (block->status == STATUS_MAPPED || size + META_SIZE >= MMAP_THRESHOLD)
+		return move_block(block, size);
+
+	/* shrinking stays in place */
+	if (block->size >= size) {
+		split_block(block, size);
+		return ptr;
+	}
+
+	/* absorb free neighbours one by one until the block is big enough */
+	while (block->next && block->next->status == STATUS_FREE) {
+		merge_next(block);
+		if (block->size >= size) {
+			split_block(block, size);
+			return ptr;
+		}
+	}
+
+	/* last block on the heap can simply be extended */
+	if (!block->next) {
+		heap_extend(size - block->size);
+		block->size = size;
+		return ptr;
+	}
+
+	return move_block(block, size);
 }
