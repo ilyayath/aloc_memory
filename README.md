@@ -36,8 +36,17 @@ cd tests
 python run_tests.py -d test-all
 ```
 
+Перевірка стилю коду (Linux kernel coding style). `checkpatch.pl` береться з дерева ядра
+Linux (`scripts/checkpatch.pl` разом із `spelling.txt` та `const_structs.checkpatch`):
+
+```sh
+checkpatch.pl --no-tree -f src/osmem.c
+```
+
 ## Результати
 
 ![build](screenshots/build.png)
 
 ![make check](screenshots/make-check.png)
+
+![checkpatch](screenshots/checkpatch.png)
